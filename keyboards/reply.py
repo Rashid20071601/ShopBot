@@ -1,8 +1,7 @@
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 
-start_kb = ReplyKeyboardMarkup(
+user_data_kb = ReplyKeyboardMarkup(
     keyboard=[
-        [KeyboardButton(text='📜 Меню')],
-        [KeyboardButton(text='👤 Профиль'), KeyboardButton(text='🆘 Помощь')],
-    ]
+        [KeyboardButton(text='Обновить данные ♻'), KeyboardButton(text='Удалить данные ❌')],
+    ], resize_keyboard=True
 )
