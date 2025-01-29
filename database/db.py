@@ -19,6 +19,35 @@ async def create_user_table():
     await conn.commit()
     await conn.close()
 
+# Наполнение таблицы товаров
+async def add_products():
+    conn = await create_connection()
+    cursor = await conn.cursor()
+    # Удаляем старые товары (если это необходимо)
+    await cursor.execute('DELETE FROM products')
+    await cursor.execute('''INSERT INTO products(name, description, price, photo, category) VALUES 
+                ("Ноутбук", "Мощный ноутбук для работы и игр", 79999.99, "image/laptop1.jpg", "Электроника"),
+                ("Смартфон", "Современный смартфон с хорошей камерой", 49999.99, "image/phone1.jpg", "Электроника"),
+                ("Кроссовки", "Удобные кроссовки для бега", 5999.99, "image/sneakers1.png", "Одежда");''')
+    await conn.commit()
+    await conn.close()
+
+# Функция для создания таблицы товаров (если не существует)
+async def create_product_table():
+    conn = await create_connection()
+    cursor = await conn.cursor()
+    await cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS products(
+                    product_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    price REAL NOT NULL,
+                    photo TEXT,
+                    category TEXT NOT NULL)''')
+    await add_products()
+    await conn.commit()
+    await conn.close()
+
 # Проверка, зарегистрирован ли пользователь
 async def check_user_exists(user_id):
     conn = await create_connection()
