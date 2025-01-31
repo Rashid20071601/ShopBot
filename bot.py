@@ -18,6 +18,7 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(bot, storage=MemoryStorage())
 user_category = {}  # Словарь для хранения категорий пользователей
 categories = []  # Глобальный список для хранения категорий
+user_steps = {}  # Словарь для хранения шагов пользователей
 
 
 async def on_startup(dp):
@@ -59,6 +60,8 @@ async def send_help(message: types.Message):
 @dp.message_handler(commands=['catalog'])
 async def show_categories(message: types.Message):
     global categories
+    user_id = message.from_user.id
+    user_steps[user_id] = "category"  # Устанавливаем шаг выбора категории
     conn = await db.create_connection()
     cursor = await conn.cursor()
 
@@ -83,6 +86,8 @@ async def show_categories(message: types.Message):
 @dp.message_handler(lambda message: any(category[0].lower() == message.text.strip().lower() for category in categories))
 async def show_products_by_category(message: types.Message):
     category = message.text.strip()
+    user_id = message.from_user.id
+    user_steps[user_id] = "product"  # Устанавливаем шаг выбора товара
     conn = await db.create_connection()
     cursor = await conn.cursor()
 
@@ -117,6 +122,7 @@ async def show_products_by_category(message: types.Message):
 @dp.message_handler(lambda message: message.text.isdigit())
 async def show_product_details(message: types.Message):
     user_id = message.from_user.id
+    user_steps[user_id] = 'product_details'
 
     # Проверяем, выбрал ли пользователь категорию
     if user_id not in user_category:
@@ -138,12 +144,47 @@ async def show_product_details(message: types.Message):
         _, name, description, price, photo = products[product_index]
         await message.answer_photo(
             photo=open(photo, 'rb'),
-            caption=f"📦 Название: {name}\n💬 Описание: {description}\n💰 Цена: {price} ₽"
+            caption=f"📦 Название: {name}\n💬 Описание: {description}\n💰 Цена: {price} ₽",
+            reply_markup=inline.back_kb
         )
 
     else:
         await message.answer("Товар с таким номером не найден.")
 # -------------------------------------------------------------------------------------------------------
+
+
+# Обработчик нажатия кнопки "Назад"
+@dp.callback_query_handler(lambda call: call.data == 'back')
+async def back_button_handler(call: types.CallbackQuery):
+    user_id = call.from_user.id
+    current_step = user_category.get(user_id, 'category')
+
+    # Если пользователь на шаге выбора категории
+    if current_step == 'category':
+        await show_categories(call.message)   # Возвращаем к списку категорий
+    
+    # Если пользователь на шаге выбора товара
+    elif current_step == 'product':
+        # Возвращаем к товарам в выбранной категории
+        category = user_category.get(user_id)   # Получаем категорию пользователя
+        if category:
+            user_steps[user_id] = category   # Обновляем шаг
+            await show_categories(call.message)   # Возвращаем к товарам в категории
+        else:
+            await call.message.answer("Сначала выберите категорию.")
+
+    # Если пользователь на шаге карточки товара
+    elif current_step == 'product_details':
+        # Возвращаем к выбору товара в выбранной категории
+        category = user_category.get(user_id)
+        if category:
+            user_steps[user_id] = 'product'  # Обновляем шаг
+            await show_products_by_category(call.message)   # Возвращаем к карточке товара
+        else:
+            await call.message.answer("Сначала выберите категорию.")
+    
+    else:
+        await call.message.answer("Не удалось вернуться к предыдущему шагу.")
 
 
 # -------------------------------------------------------------------------------------------------------
