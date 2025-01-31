@@ -7,6 +7,7 @@ from pyexpat.errors import messages
 async def create_connection():
     return await aiosqlite.connect('shop.db')
 
+
 # Функция для создания таблицы пользователей (если не существует)
 async def create_user_table():
     conn = await create_connection()
@@ -18,6 +19,7 @@ async def create_user_table():
                     phone INTEGER)''')
     await conn.commit()
     await conn.close()
+
 
 # Наполнение таблицы товаров
 async def add_products():
@@ -31,6 +33,7 @@ async def add_products():
                 ("Кроссовки", "Удобные кроссовки для бега", 5999.99, "image/sneakers1.png", "Одежда");''')
     await conn.commit()
     await conn.close()
+
 
 # Функция для создания таблицы товаров (если не существует)
 async def create_product_table():
@@ -48,6 +51,7 @@ async def create_product_table():
     await conn.commit()
     await conn.close()
 
+
 # Проверка, зарегистрирован ли пользователь
 async def check_user_exists(user_id):
     conn = await create_connection()
@@ -57,9 +61,9 @@ async def check_user_exists(user_id):
     await conn.close()
     return user is not None
 
+
 # Сохранение данных пользователя в базе данных
 async def save_user_data(user_id, email, phone):
-    print(f"Сохраняем данные: user_id={user_id}, email={email}, phone={phone}")
     conn = await create_connection()
     cursor = await conn.cursor()
     # Если телефон не передан, вставляем только email
@@ -71,6 +75,7 @@ async def save_user_data(user_id, email, phone):
     await conn.commit()
     await conn.close()
 
+
 # Сохранение обновленых данных пользователя в базе данных
 async def update_user_data(user_id, email, phone):
     conn = await create_connection()
@@ -79,5 +84,14 @@ async def update_user_data(user_id, email, phone):
         await cursor.execute("UPDATE users SET email=? WHERE telegram_id=?", (email, user_id))
     elif phone:
         await cursor.execute("UPDATE users SET phone=? WHERE telegram_id=?", (phone, user_id))
+    await conn.commit()
+    await conn.close()
+
+
+# Удаление данных пользователя
+async def delete_user_data(user_id):
+    conn = await create_connection()
+    cursor = await conn.cursor()
+    await cursor.execute("DELETE FROM users WHERE telegram_id=?", (user_id,))
     await conn.commit()
     await conn.close()
