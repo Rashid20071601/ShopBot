@@ -1,6 +1,5 @@
 # Импорт библиотек
 import aiosqlite
-from pyexpat.errors import messages
 
 
 # Функция для подключения к базе данных
@@ -66,12 +65,12 @@ async def check_user_exists(user_id):
 async def save_user_data(user_id, email, phone):
     conn = await create_connection()
     cursor = await conn.cursor()
-    # Если телефон не передан, вставляем только email
-    if email is not None and phone is None:
-        await cursor.execute("INSERT INTO users (telegram_id, email) VALUES (?,?)", (user_id, email))
-    # Если телефон передан, вставляем оба поля
-    elif email is None and phone is not None:
-        await cursor.execute("INSERT INTO users (telegram_id, email, phone) VALUES (?,?,?)", (user_id, email, phone))
+    if email and phone:
+        await cursor.execute("INSERT INTO users (telegram_id, email, phone) VALUES (?, ?, ?)", (user_id, email, phone))
+    elif email:
+        await cursor.execute("INSERT INTO users (telegram_id, email) VALUES (?, ?)", (user_id, email))
+    elif phone:
+        await cursor.execute("INSERT INTO users (telegram_id, phone) VALUES (?, ?)", (user_id, phone))
     await conn.commit()
     await conn.close()
 
