@@ -111,11 +111,11 @@ async def show_product_details(message: types.Message, state: FSMContext):
 
     if 0 <= product_index < len(products):
         # Отправляем карточку товара
-        _, name, description, price, photo = products[product_index]
+        product_id, name, description, price, photo = products[product_index]
         await message.answer_photo(
             photo=open(photo, 'rb'),
             caption=f"📦 Название: {name}\n💬 Описание: {description}\n💰 Цена: {price} ₽",
-            reply_markup=inline.back_kb
+            reply_markup=inline.cart_kb(product_id)
         )
 
     else:

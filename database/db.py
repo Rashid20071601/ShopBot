@@ -4,20 +4,54 @@ import aiosqlite
 
 # Функция для подключения к базе данных
 async def create_connection():
-    return await aiosqlite.connect('shop.db')
+    conn = await aiosqlite.connect("shop.db")
+    cursor = await conn.cursor()
+    await cursor.execute("PRAGMA foreign_keys = ON;")  # Включаем поддержку FOREIGN KEY
+    return conn
 
 
-# Функция для создания таблицы пользователей (если не существует)
+# Функция для создания таблицы (если не существует)
 async def create_user_table():
     conn = await create_connection()
     cursor = await conn.cursor()
     await cursor.execute('''
                     CREATE TABLE IF NOT EXISTS users
-                    (telegram_id INTEGER PRIMARY KEY,
+                    (user_id INTEGER PRIMARY KEY,
                     email TEXT,
                     phone INTEGER)''')
     await conn.commit()
     await conn.close()
+
+async def create_product_table():
+    conn = await create_connection()
+    cursor = await conn.cursor()
+    await cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS products(
+                    product_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    description TEXT,
+                    price REAL NOT NULL,
+                    photo TEXT,
+                    category TEXT NOT NULL)''')
+    # await add_products()
+    await conn.commit()
+    await conn.close()
+
+
+async def create_cart_table():
+    conn = await create_connection()
+    cursor = await conn.cursor()
+
+    await cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS cart
+                    (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_id INTEGER NOT NULL,
+                        product_id INTEGER NOT NULL,
+                        quantity INTEGER NOT NULL DEFAULT 1,
+                        FOREIGN KEY (product_id) REFERENCES products(product_id))''')
+    await conn.commit()
+    await conn.close()
+    
 
 
 # Наполнение таблицы товаров
@@ -34,28 +68,12 @@ async def add_products():
     await conn.close()
 
 
-# Функция для создания таблицы товаров (если не существует)
-async def create_product_table():
-    conn = await create_connection()
-    cursor = await conn.cursor()
-    await cursor.execute('''
-                    CREATE TABLE IF NOT EXISTS products(
-                    product_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    name TEXT NOT NULL,
-                    description TEXT,
-                    price REAL NOT NULL,
-                    photo TEXT,
-                    category TEXT NOT NULL)''')
-    await add_products()
-    await conn.commit()
-    await conn.close()
-
 
 # Проверка, зарегистрирован ли пользователь
 async def check_user_exists(user_id):
     conn = await create_connection()
     cursor = await conn.cursor()
-    await cursor.execute("SELECT * FROM users WHERE telegram_id=?", (user_id,))
+    await cursor.execute("SELECT * FROM users WHERE user_id=?", (user_id,))
     user = await cursor.fetchone()
     await conn.close()
     return user is not None
@@ -66,11 +84,11 @@ async def save_user_data(user_id, email, phone):
     conn = await create_connection()
     cursor = await conn.cursor()
     if email and phone:
-        await cursor.execute("INSERT INTO users (telegram_id, email, phone) VALUES (?, ?, ?)", (user_id, email, phone))
+        await cursor.execute("INSERT INTO users (user_id, email, phone) VALUES (?, ?, ?)", (user_id, email, phone))
     elif email:
-        await cursor.execute("INSERT INTO users (telegram_id, email) VALUES (?, ?)", (user_id, email))
+        await cursor.execute("INSERT INTO users (user_id, email) VALUES (?, ?)", (user_id, email))
     elif phone:
-        await cursor.execute("INSERT INTO users (telegram_id, phone) VALUES (?, ?)", (user_id, phone))
+        await cursor.execute("INSERT INTO users (user_id, phone) VALUES (?, ?)", (user_id, phone))
     await conn.commit()
     await conn.close()
 
@@ -80,9 +98,9 @@ async def update_user_data(user_id, email, phone):
     conn = await create_connection()
     cursor = await conn.cursor()
     if email:
-        await cursor.execute("UPDATE users SET email=? WHERE telegram_id=?", (email, user_id))
+        await cursor.execute("UPDATE users SET email=? WHERE user_id=?", (email, user_id))
     elif phone:
-        await cursor.execute("UPDATE users SET phone=? WHERE telegram_id=?", (phone, user_id))
+        await cursor.execute("UPDATE users SET phone=? WHERE user_id=?", (phone, user_id))
     await conn.commit()
     await conn.close()
 
@@ -91,6 +109,6 @@ async def update_user_data(user_id, email, phone):
 async def delete_user_data(user_id):
     conn = await create_connection()
     cursor = await conn.cursor()
-    await cursor.execute("DELETE FROM users WHERE telegram_id=?", (user_id,))
+    await cursor.execute("DELETE FROM users WHERE user_id=?", (user_id,))
     await conn.commit()
     await conn.close()
