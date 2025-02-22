@@ -16,14 +16,18 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from admin_panel import settings
+from django.conf import settings
 from django.conf.urls.static import static
 from catalog import views as catalog_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('catalog/', catalog_views.catalog, name='catalog'),
-    path('add/', catalog_views.add_product, name='add'),
+    path('', catalog_views.catalog, name='catalog'),
+    path('product/add/', catalog_views.add_product, name='add_product'),
+    path('categories/', catalog_views.category_list, name='category_list'),
+    path('categories/add/', catalog_views.add_category, name='add_category'),
+    path('categories/edit/<int:category_id>/', catalog_views.edit_category, name='edit_category'),
+    path('categories/delete/<int:category_id>/', catalog_views.delete_category, name='delete_category'),
 ]
 
 if settings.DEBUG:
