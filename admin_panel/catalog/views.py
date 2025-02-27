@@ -1,4 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.models import User
+from django.contrib.auth.decorators import login_required
 from .forms import *
 from .models import *
 
@@ -60,3 +62,17 @@ def delete_category(request, category_id):
 def category_list(request):
     categories = Category.objects.all()
     return render(request, 'catalog/category_list.html', {'categories': categories})
+
+
+def user_list(request):
+    users = User.objects.all()
+    return render(request, 'users/user_list.html', {'users': users})
+
+
+@login_required  # Доступ только авторизованным
+def delete_user(request, user_id):
+    user = get_object_or_404(User, id=user_id)
+    if request.user.is_superuser and user != request.user:  # Только админ может удалять | # Нельзя удалить себя
+        user.delete()
+    
+    return redirect('user_list')

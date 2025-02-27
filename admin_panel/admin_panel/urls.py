@@ -28,6 +28,8 @@ urlpatterns = [
     path('categories/add/', catalog_views.add_category, name='add_category'),
     path('categories/edit/<int:category_id>/', catalog_views.edit_category, name='edit_category'),
     path('categories/delete/<int:category_id>/', catalog_views.delete_category, name='delete_category'),
+    path('users/', catalog_views.user_list, name='user_list'),
+    path('user/delete/<int:user_id>/', catalog_views.delete_user, name='delete_user'),
 ]
 
 if settings.DEBUG:
