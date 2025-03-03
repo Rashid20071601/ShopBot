@@ -10,3 +10,20 @@ class UserRegistration(StatesGroup):
 
 class CartState(StatesGroup):
     waiting_for_product_id = State()
+
+
+import os
+import sys
+import django
+
+# Получаем путь к корневой директории проекта (ShopBot)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(BASE_DIR)  # Добавляем корневую директорию проекта
+
+# Добавляем `admin_panel` в sys.path
+ADMIN_PANEL_DIR = os.path.join(BASE_DIR, "admin_panel")
+sys.path.append(ADMIN_PANEL_DIR)
+
+# Устанавливаем переменные окружения Django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'admin_panel.settings')
+django.setup()

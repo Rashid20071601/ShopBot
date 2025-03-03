@@ -4,31 +4,21 @@ from aiogram.dispatcher.storage import FSMContext
 from keyboards import inline, reply
 from database import db
 from config import CartState
+import config
+from catalog.models import * # type: ignore
+from asgiref.sync import sync_to_async
 
 
 # Функция просмотра корзины
 async def view_cart(message: types.Message, state: FSMContext):
     user_id = message.from_user.id  # Получаем ID пользователя
-    
-    conn = await db.create_connection()
-    cursor = await conn.cursor()
+    user = await sync_to_async(User.objects.get(pk=user_id)) # type: ignore
 
     # Сохраняем состояние в FSM
     # state.update_data(current_step='cart')
 
-    cart = await cursor.execute("SELECT * FROM cart")
-    cart = await cart.fetchall()
-    print(cart)
-
     # Получаем товары в корзине с их названиями и ценами
-    cart_items = await cursor.execute('''
-                                    SELECT p.name, p.price, c.quantity 
-                                    FROM cart c
-                                    JOIN products p ON c.product_id = p.product_id
-                                    WHERE c.user_id = ?
-                                    ''',
-                                    (user_id,))
-    cart_items = await cart_items.fetchall()
+    cart_items = await sync_to_async(Cart.objects.filter(user=user).select_related('product').values('product__name', 'product__price', 'quantity')) # type: ignore
     
     if not cart_items:
         await message.answer("Ваша корзина пуста.")
@@ -37,42 +27,31 @@ async def view_cart(message: types.Message, state: FSMContext):
         # Возвращаем товары в корзине пользователя
         await message.answer(f"Ваша корзина\n\n{cart_items}", reply_markup=reply.cart_kb)
 
-    await conn.close()
-
 
 # Функция добавления товара в корзину
 async def add_to_cart(call: types.CallbackQuery):
-    conn = await db.create_connection()
-    cursor = await conn.cursor()
 
     user_id = call.from_user.id
     product_id = int(call.data.split('_')[-1])  # Извлекаем ID товара из callback-данных
-    quantity = 1  # По умолчанию добавляем 1 шт. в корзину
+
+    user = await sync_to_async(lambda: User.objects.get(pk=user_id))() # type: ignore
+    product = await sync_to_async(lambda: Product.objects.get(pk=product_id))() # type: ignore
 
     # Проверяем, существует ли товар в таблице products
-    product_exists = await cursor.execute("SELECT 1 FROM products WHERE product_id = ?", (product_id,))
-    if not await product_exists.fetchone():
+    if not Product.objects.filter(product_id=product_id).exists(): # type: ignore
         await call.message.answer("Ошибка: товар не существует!")
-        await conn.close()
         return
 
     # Проверяем, есть ли уже этот товар в корзине пользователя
-    existing_item = await cursor.execute("SELECT quantity FROM cart WHERE user_id = ? AND product_id = ?", (user_id, product_id))
-    existing_item = await existing_item.fetchone()
+    cart_item, created = await sync_to_async(lambda: Cart.objects.get_or_create(user=user, product=product))() # type: ignore
 
-    if existing_item:
+    if not created:
         # Если товар уже в корзине, обновляем его количество
-        new_quantity = existing_item[0] + 1
-        await cursor.execute("UPDATE cart SET quantity = ? WHERE user_id = ? AND product_id = ?", (new_quantity, user_id, product_id))
+        await cart_item.quantity + 1
+
+    await cart_item.save()
     
-    else:
-        # Если товара нет в корзине, добавляем его
-        await cursor.execute("INSERT INTO cart (user_id, product_id, quantity) VALUES (?, ?, ?)", (user_id, product_id, quantity))
-
     await call.message.answer("Товар добавлен в корзину!")
-
-    await conn.commit()
-    await conn.close()
     await call.answer()
 
 
@@ -83,10 +62,9 @@ async def start_remove_from_cart(message: types.Message, state: FSMContext):
     await CartState.waiting_for_product_id.set()
 
 async def process_remove_from_cart(message: types.Message, state: FSMContext):
-    conn = await db.create_connection()
-    cursor = await conn.cursor()
-    
+
     user_id = message.from_user.id
+    user = await sync_to_async(User.objects.get(pk=user_id)) # type: ignore
 
     # Проверяем, что пользователь ввел число
     if not message.text.isdigit():
@@ -95,19 +73,16 @@ async def process_remove_from_cart(message: types.Message, state: FSMContext):
     product_id = int(message.text)-1
 
     # Получаем товары в корзине
-    cart_items = await cursor.execute("SELECT product_id FROM cart WHERE user_id = ?", (user_id,))
-    cart_items = await cart_items.fetchall()
+    cart_items = await sync_to_async(lambda: list(Cart.objects.filter(user=user).select_related('product').values_list('product__id', flat=True))) # type: ignore
 
     if 0 <= product_id < len(cart_items):
-        product_to_delete = cart_items[product_id][0]
-        await cursor.execute("DELETE FROM cart WHERE user_id = ? AND product_id = ?", (user_id, product_to_delete))
-        await conn.commit()
+        product_to_delete = cart_items[product_id]
+        # Удаляем товар из корзины через ORM
+        await sync_to_async(lambda: Cart.objects.filter(user=user, product_id=product_to_delete).delete)() # type: ignore
         await message.answer("Товар удалён из корзины!")
 
     else:
         await message.answer("Такого товара нет в корзине!")
-
-    await conn.close()
 
     # Завершаем состояние
     await state.finish()
@@ -126,14 +101,8 @@ async def do_not_clear_cart(call: types.CallbackQuery):
 # Функция очистки корзины
 async def clear_cart(call: types.CallbackQuery):
     user_id = call.from_user.id
-
-    conn = await db.create_connection()
-    cursor = await conn.cursor()
     
-    await cursor.execute("DELETE FROM cart WHERE user_id = ?", (user_id,))
-
-    await conn.commit()
-    await conn.close()
+    await sync_to_async(lambda: Cart.objects.filter(user_id=user_id).delete)() # type: ignore
 
     await call.message.answer("Корзина очищена.")
     await call.answer()

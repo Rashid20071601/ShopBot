@@ -4,9 +4,9 @@ from .models import *
 class CategoryForm(forms.ModelForm):
     class Meta:
         model = Category
-        fields = ['name']
+        fields = ['category_id', 'name']
 
 class ProductForm(forms.ModelForm):
     class Meta:
         model = Product
-        fields = ['name', 'description', 'price', 'image', 'category']
+        fields = ['product_id', 'name', 'description', 'price', 'photo', 'category']

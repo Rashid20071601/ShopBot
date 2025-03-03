@@ -2,23 +2,15 @@
 from aiogram import types
 from aiogram.dispatcher.storage import FSMContext
 from keyboards import inline, reply
-from database import db
-
+import config
+from catalog.models import * # type: ignore
+from asgiref.sync import sync_to_async
 
 
 '''============================================================================================================'''
 async def show_categories(message: types.Message, state: FSMContext):
     """Отображает список категорий из БД"""
-
-    # Создаем соединение с базой данных
-    conn = await db.create_connection()
-    cursor = await conn.cursor()
-
-    # Получаем уникальные категории
-    categories = await cursor.execute("SELECT DISTINCT category FROM products")
-    categories = await categories.fetchall()
-
-    await conn.close()
+    categories = await sync_to_async(lambda: list(Category.objects.values_list('name', flat=True)))() # type: ignore
 
     # Сохраняем состояние в FSM
     await state.update_data(current_step='category', selected_category=None)
@@ -31,7 +23,7 @@ async def show_categories(message: types.Message, state: FSMContext):
     # Формируем кнопки с категориями
     category_kb = types.ReplyKeyboardMarkup(resize_keyboard=True)
     for category in categories:
-        category_kb.add(category[0])  # Добавляем каждую категорию в кнопки
+        category_kb.add(category)  # Добавляем каждую категорию в кнопки
 
     await message.answer("Выберите категорию", reply_markup=category_kb)
 '''============================================================================================================'''
@@ -56,22 +48,16 @@ async def show_products_by_category(message: types.Message, state: FSMContext, c
     # Сохраняем состояние в FSM
     await state.update_data(current_step='product', selected_category=selected_category)
 
-    conn = await db.create_connection()
-    cursor = await conn.cursor()
-
     # Проверяем, существует ли такая категория
-    category_check = await cursor.execute("SELECT DISTINCT category FROM products WHERE category=?", (selected_category,))
-    category_check = await category_check.fetchone()  # Получаем одну строку
+    category_check = await sync_to_async(Category.objects.filter(name=selected_category).first)() # type: ignore
 
     if not category_check:   # Если ничего не найдено, значит категории нет
         await message.answer("Такой категории нет, выберите из списка.")
-        await conn.close()
         return
 
     # Получаем товары из выбранной категории
-    products = await cursor.execute("SELECT product_id, name, price FROM products WHERE category=?", (selected_category,))
-    products = await products.fetchall()
-    await conn.close()
+    categories = await sync_to_async(Category.objects.filter(name=selected_category).first)() # type: ignore
+    products = await sync_to_async(lambda: list(Product.objects.filter(category=categories).values_list('product_id', 'name', 'price')))() # type: ignore
 
     if not products:
         await message.answer("В этой категории пока нет товаров.", reply_markup=types.ReplyKeyboardRemove())
@@ -100,20 +86,17 @@ async def show_product_details(message: types.Message, state: FSMContext):
         return
     
     product_index = int(message.text)-1
-    category = selected_category
-    conn = await db.create_connection()
-    cursor = await conn.cursor()
+    category = await sync_to_async(lambda: Category.objects.get(name=selected_category))() # type: ignore
 
     # Получаем товары из категории
-    products = await cursor.execute("SELECT product_id, name, description, price, photo FROM products WHERE category=?", (category,))
-    products = await products.fetchall()
-    await conn.close()
+    products = await sync_to_async(lambda: list(Product.objects.filter(category=category).values_list('product_id', 'name', 'description', 'price', 'photo')))() # type: ignore
 
     if 0 <= product_index < len(products):
         # Отправляем карточку товара
-        product_id, name, description, price, photo = products[product_index]
+        product_id, name, description, price, photo = products[0]
+        photo_path = f"media/{photo}"
         await message.answer_photo(
-            photo=open(photo, 'rb'),
+            photo=open(photo_path, 'rb'),
             caption=f"📦 Название: {name}\n💬 Описание: {description}\n💰 Цена: {price} ₽",
             reply_markup=inline.cart_kb(product_id)
         )

@@ -7,11 +7,11 @@
     <tr>
         <td>{{ category.name }}</td>
         <td>
-            <a href="{% url 'edit_category' category.id %}" class="btn btn-warning btn-sm">✏️ Редактировать</a>
-            <a href="{% url 'delete_category' category.id %}" class="btn btn-danger btn-sm">🗑️ Удалить</a>
+            <a href="{% url 'edit_category' category.category_id %}" class="btn btn-warning btn-sm">✏️ Редактировать</a>
+            <a href="{% url 'delete_category' category.category_id %}" class="btn btn-danger btn-sm">🗑️ Удалить</a>
         </td>
     </tr>
     {% endfor %}
 </ul>
-<a href="{% url 'add_category' %}">Добавить категорию</a>
+<a href="{% url 'add_category' %}">➕ Добавить категорию</a>
 {% endblock %}

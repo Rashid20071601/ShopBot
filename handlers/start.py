@@ -3,14 +3,17 @@ from aiogram import types
 from aiogram.dispatcher.storage import FSMContext
 from keyboards import reply, inline
 from config import *
-from database import db
+import config
+from catalog.models import * # type: ignore
+from asgiref.sync import sync_to_async
 
 
 
 async def send_welcome(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
+    user = await sync_to_async(User.objects.filter(user_id=user_id).first())() # type: ignore
 
-    if await db.check_user_exists(user_id):
+    if user:
         await message.answer("Добро пожаловать в наш онлайн-магазин! 🛍️\nНажмит на кнопку ниже\nИли введите /help для списка команд.",
                              reply_markup=reply.start_kb)
         # Сохраняем состояние в FSM

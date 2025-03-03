@@ -3,8 +3,9 @@ from aiogram import types
 from aiogram.dispatcher.storage import FSMContext
 from config import *
 from keyboards import inline, reply
-from database import db
-
+import config
+from catalog.models import * # type: ignore
+from asgiref.sync import sync_to_async
 
 
 async def send_update(message: types.Message):
@@ -21,7 +22,7 @@ async def choice_delete(call: types.CallbackQuery):
     user_id = call.from_user.id
 
     if call.data == 'yes':
-        await db.delete_user_data(user_id)
+        await sync_to_async(lambda: User.objects.get(user_id=user_id).delete())() # type: ignore
         await call.message.answer("✅ Все ваши данные удалены", reply_markup=types.ReplyKeyboardRemove())
 
     elif call.data == 'no':
@@ -42,24 +43,25 @@ async def update_data(message: types.Message):
 
 async def get_email(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
+    user = await sync_to_async(User.objects.filter(user_id=user_id).first())() # type: ignore
     email = message.text.strip() if message.text else None
 
-    if await db.check_user_exists(user_id):
-        await state.update_data(email=email)  # Сохраняем email в state
-        await UserRegistration.waiting_for_phone.set()
-        await message.answer("Теперь введите ваш новый номер телефона.")
+    if user:
+        await message.answer("Теперь, пожалуйста, введите ваш новый номер телефона для обновления данных.")
 
     else:
-        # Сохраняем e-mail в базе данных
-        await state.update_data(email=email)  # Сохраняем email в state
         await message.answer("Email добавлен")
         await message.answer("Теперь, пожалуйста, введите ваш номер телефона.")
-        await UserRegistration.waiting_for_phone.set()
+
+    # Сохраняем e-mail в базе данных
+    await UserRegistration.waiting_for_phone.set()
+    await state.update_data(email=email)  # Сохраняем email в state
 
 
 
 async def get_phone(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
+    user = await sync_to_async(User.objects.filter(user_id=user_id).first())() # type: ignore
     phone = message.text
 
     # Получаем сохранённый email из state
@@ -72,12 +74,12 @@ async def get_phone(message: types.Message, state: FSMContext):
         return
 
     # Проверяем, существует ли пользователь
-    if await db.check_user_exists(user_id):
-        await db.update_user_data(user_id=user_id, email=email, phone=phone)
+    if user:
+        await sync_to_async(lambda: User.objects.filter(user_id=user_id).update(email=email, phone=phone))() # type: ignore
         await message.answer("Данные обновлены 👌")
 
     else:
-        await db.save_user_data(user_id=user_id, email=email, phone=phone)
+        await sync_to_async(lambda: User.objects.create(user_id=user_id, email=email, phone=phone))() # type: ignore
         await message.answer("Email и номер телефона добавлены")
         await message.answer("Регистрация завершена! Теперь вы можете просматривать товары. 🛍️")
 
