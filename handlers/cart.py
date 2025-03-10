@@ -12,20 +12,20 @@ from asgiref.sync import sync_to_async
 # Функция просмотра корзины
 async def view_cart(message: types.Message, state: FSMContext):
     user_id = message.from_user.id  # Получаем ID пользователя
-    user = await sync_to_async(User.objects.get(pk=user_id)) # type: ignore
+    user = await sync_to_async(lambda: User.objects.get(pk=user_id))() # type: ignore
 
     # Сохраняем состояние в FSM
     # state.update_data(current_step='cart')
 
     # Получаем товары в корзине с их названиями и ценами
-    cart_items = await sync_to_async(Cart.objects.filter(user=user).select_related('product').values('product__name', 'product__price', 'quantity')) # type: ignore
+    cart_items = await sync_to_async(lambda: list(Cart.objects.filter(user=user).select_related('product').values('product__name', 'product__price', 'quantity')))() # type: ignore
     
     if not cart_items:
         await message.answer("Ваша корзина пуста.")
     else:
-        cart_items = '\n'.join([f"{i+1}. {item[0]} - {item[1]} руб. - {item[2]} шт." for i, item in enumerate(cart_items)])
+        cart_items_str = '\n'.join([f"{i+1}. {item['product__name']} - {item['product__price']} руб. - {item['quantity']} шт." for i, item in enumerate(cart_items)])
         # Возвращаем товары в корзине пользователя
-        await message.answer(f"Ваша корзина\n\n{cart_items}", reply_markup=reply.cart_kb)
+        await message.answer(f"Ваша корзина\n\n{cart_items_str}", reply_markup=reply.cart_kb)
 
 
 # Функция добавления товара в корзину
@@ -38,7 +38,7 @@ async def add_to_cart(call: types.CallbackQuery):
     product = await sync_to_async(lambda: Product.objects.get(pk=product_id))() # type: ignore
 
     # Проверяем, существует ли товар в таблице products
-    if not Product.objects.filter(product_id=product_id).exists(): # type: ignore
+    if not await sync_to_async(lambda: Product.objects.filter(product_id=product_id).exists())(): # type: ignore
         await call.message.answer("Ошибка: товар не существует!")
         return
 
@@ -47,9 +47,10 @@ async def add_to_cart(call: types.CallbackQuery):
 
     if not created:
         # Если товар уже в корзине, обновляем его количество
-        await cart_item.quantity + 1
+        cart_item.quantity += 1
 
-    await cart_item.save()
+    # Сохраняем корзину
+    await sync_to_async(cart_item.save)()
     
     await call.message.answer("Товар добавлен в корзину!")
     await call.answer()
@@ -64,7 +65,7 @@ async def start_remove_from_cart(message: types.Message, state: FSMContext):
 async def process_remove_from_cart(message: types.Message, state: FSMContext):
 
     user_id = message.from_user.id
-    user = await sync_to_async(User.objects.get(pk=user_id)) # type: ignore
+    user = await sync_to_async(lambda: User.objects.get(pk=user_id))() # type: ignore
 
     # Проверяем, что пользователь ввел число
     if not message.text.isdigit():
@@ -73,12 +74,12 @@ async def process_remove_from_cart(message: types.Message, state: FSMContext):
     product_id = int(message.text)-1
 
     # Получаем товары в корзине
-    cart_items = await sync_to_async(lambda: list(Cart.objects.filter(user=user).select_related('product').values_list('product__id', flat=True))) # type: ignore
+    cart_items = await sync_to_async(lambda: list(Cart.objects.filter(user=user).select_related('product').values_list('product__product_id', flat=True)))() # type: ignore
 
     if 0 <= product_id < len(cart_items):
         product_to_delete = cart_items[product_id]
         # Удаляем товар из корзины через ORM
-        await sync_to_async(lambda: Cart.objects.filter(user=user, product_id=product_to_delete).delete)() # type: ignore
+        await sync_to_async(lambda: Cart.objects.filter(user=user, product_id=product_to_delete).delete())() # type: ignore
         await message.answer("Товар удалён из корзины!")
 
     else:
@@ -102,7 +103,7 @@ async def do_not_clear_cart(call: types.CallbackQuery):
 async def clear_cart(call: types.CallbackQuery):
     user_id = call.from_user.id
     
-    await sync_to_async(lambda: Cart.objects.filter(user_id=user_id).delete)() # type: ignore
+    await sync_to_async(lambda: Cart.objects.filter(user_id=user_id).delete())() # type: ignore
 
     await call.message.answer("Корзина очищена.")
     await call.answer()

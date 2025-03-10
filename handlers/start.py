@@ -11,7 +11,7 @@ from asgiref.sync import sync_to_async
 
 async def send_welcome(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
-    user = await sync_to_async(User.objects.filter(user_id=user_id).first())() # type: ignore
+    user = await sync_to_async(lambda: User.objects.filter(user_id=user_id).first())() # type: ignore
 
     if user:
         await message.answer("Добро пожаловать в наш онлайн-магазин! 🛍️\nНажмит на кнопку ниже\nИли введите /help для списка команд.",

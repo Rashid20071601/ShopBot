@@ -1,4 +1,5 @@
 # Импорт библиотек
+import logging
 from aiogram import types
 from . import catalog
 from aiogram.dispatcher.storage import FSMContext
@@ -18,13 +19,11 @@ async def back_button_handler(call: types.CallbackQuery, state: FSMContext):
     # Возвращаем пользователя на предыдущий этап
     if current_step == 'product_details':
         await state.update_data(current_step='product')  # Назад к списку товаров
-        if selected_category:
-            await catalog.show_products_by_category(message=call.message, category=selected_category, state=state)  # Возвращаем к товарам в категории
-        else:
-            await call.message.answer("Сначала выберите категорию.")
+        await catalog.show_products_by_category(call.message, state, category=selected_category)
     
     elif current_step == 'product':
         await state.update_data(current_step='category')  # Назад к категориям
+        current_step = state_data.get('current_step')
         await catalog.show_categories(call.message, state=state)  # Возвращаем к списку категорий
 
     elif current_step == 'category':

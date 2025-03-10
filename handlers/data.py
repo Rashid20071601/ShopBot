@@ -43,25 +43,29 @@ async def update_data(message: types.Message):
 
 async def get_email(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
-    user = await sync_to_async(User.objects.filter(user_id=user_id).first())() # type: ignore
-    email = message.text.strip() if message.text else None
+    user = await sync_to_async(lambda: User.objects.filter(user_id=user_id).first())() # type: ignore
+    try:
+        email = message.text.strip() if message.text else None
 
-    if user:
-        await message.answer("Теперь, пожалуйста, введите ваш новый номер телефона для обновления данных.")
+        if user:
+            await message.answer("Теперь, пожалуйста, введите ваш новый номер телефона для обновления данных.")
 
-    else:
-        await message.answer("Email добавлен")
-        await message.answer("Теперь, пожалуйста, введите ваш номер телефона.")
+        else:
+            await message.answer("Email добавлен")
+            await message.answer("Теперь, пожалуйста, введите ваш номер телефона.")
 
-    # Сохраняем e-mail в базе данных
-    await UserRegistration.waiting_for_phone.set()
-    await state.update_data(email=email)  # Сохраняем email в state
+        # Сохраняем e-mail в базе данных
+        await UserRegistration.waiting_for_phone.set()
+        await state.update_data(email=email)  # Сохраняем email в state
+    
+    except ValueError as e:
+        await message.answer(f"Произошла ошибка: {str(e)}\nВведите команду /update заново.")
 
 
 
 async def get_phone(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
-    user = await sync_to_async(User.objects.filter(user_id=user_id).first())() # type: ignore
+    user = await sync_to_async(lambda: User.objects.filter(user_id=user_id).first())() # type: ignore
     phone = message.text
 
     # Получаем сохранённый email из state
@@ -74,16 +78,21 @@ async def get_phone(message: types.Message, state: FSMContext):
         return
 
     # Проверяем, существует ли пользователь
-    if user:
-        await sync_to_async(lambda: User.objects.filter(user_id=user_id).update(email=email, phone=phone))() # type: ignore
-        await message.answer("Данные обновлены 👌")
+    try:
+        if user:
+            await sync_to_async(lambda: User.objects.filter(user_id=user_id).update(email=email, phone=phone))() # type: ignore
+            await message.answer("Данные обновлены 👌")
 
-    else:
-        await sync_to_async(lambda: User.objects.create(user_id=user_id, email=email, phone=phone))() # type: ignore
-        await message.answer("Email и номер телефона добавлены")
-        await message.answer("Регистрация завершена! Теперь вы можете просматривать товары. 🛍️")
+        else:
+            await sync_to_async(lambda: User.objects.create(user_id=user_id, email=email, phone=phone))() # type: ignore
+            await message.answer("Email и номер телефона добавлены")
+            await message.answer("Регистрация завершена! Теперь вы можете просматривать товары. 🛍️")
+    
+    except ValueError as e:
+        await message.answer(f"Произошла ошибка: {str(e)}\nВведите команду /update заново.")
 
-    await state.finish()
+    await state.reset_state(with_data=False)  
+
 
 
 

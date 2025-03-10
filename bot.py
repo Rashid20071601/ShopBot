@@ -1,7 +1,6 @@
 # Импорт библиотек
-from aiogram import Bot, Dispatcher, types, executor
+from aiogram import Bot, Dispatcher, executor
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
-from aiogram.dispatcher.storage import FSMContext
 import logging
 import config
 import handlers.back
@@ -9,8 +8,10 @@ import handlers.cart
 import handlers.catalog
 import handlers.data
 import handlers.start
-from keyboards import inline, reply
 
+
+# Настройка логирования
+# logging.basicConfig(filename='bot.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Логирование
 logging.basicConfig(level=logging.INFO)
@@ -39,10 +40,10 @@ dp.message_handler(commands=['help'])(handlers.start.send_help)
 dp.message_handler(commands=['catalog'])(handlers.catalog.show_categories)
 
 # Обработчик выбора категории
-dp.message_handler(lambda message: message.text and not message.text.isdigit() and message.text not in EXCLUDED_BUTTONS)(handlers.catalog.show_products_by_category)
+dp.message_handler(lambda message: message.text and not message.text.isdigit() and message.text not in EXCLUDED_BUTTONS)(handlers.catalog.show_products_by_category_wrapper)
 
 # Обработчик выбора товара
-dp.message_handler(lambda message: message.text.isdigit())((handlers.catalog.show_product_details))
+dp.message_handler(lambda message: message.text.isdigit())(handlers.catalog.show_product_details_wrapper)
 
 # Обработчик нажатия кнопки "Назад"
 dp.callback_query_handler(lambda call: call.data == 'back')(handlers.back.back_button_handler)
