@@ -10,30 +10,10 @@ import handlers.cart
 import handlers.catalog
 import handlers.data
 import handlers.start
-from dotenv import load_dotenv
-import os
 
 
-# --------------- Настройка токена --------------- #
-# Загружаем переменные из .env
-load_dotenv()
-
-# Получаем токен из окружения
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-
-# Проверяем, что токен загружен
-if not BOT_TOKEN:
-    raise ValueError("Токен бота не найден! Проверь .env файл.")
-
-
-# --------------- Настраиваем логирование в файл --------------- #
-logging.basicConfig(
-    filename='bot.log', 
-    level=logging.INFO, 
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    encoding='utf-8',
-    filemode='a'
-)
+# Настройка логирования
+# logging.basicConfig(filename='bot.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Создаем обработчик для вывода логов в консоль
 console_handler = logging.StreamHandler(sys.stdout)
@@ -46,7 +26,7 @@ logger = logging.getLogger()
 logger.addHandler(console_handler)
 
 
-#  --------------- Инициализация бота и диспетчера --------------- #
+# --------------- Инициализация бота и диспетчера --------------- #
 bot = Bot(token=config.BOT_TOKEN)
 dp = Dispatcher(bot, storage=MemoryStorage())
 
@@ -71,13 +51,8 @@ dp.message_handler(commands=['start'])(handlers.start.send_welcome)
 logger.info("Обработчик команды /help зарегистрирован")
 dp.message_handler(commands=['help'])(handlers.start.send_help)
 
-# Обработчик команды /commands
-logger.info("Обработчик команды /commands зарегистрирован")
-dp.message_handler(commands=['commands'])(handlers.start.show_commands)
-
 # Обработчик команды /catalog для отображения категорий
-logger.info("Обработчик команды /catalog зарегистрирован")
-dp.message_handler(lambda message: message.text == texts.catalog)(handlers.catalog.show_categories)
+dp.message_handler(commands=['catalog'])(handlers.catalog.show_categories)
 
 # Обработчик выбора категории
 logger.info("Обработчик выбора категории зарегистрирован")
@@ -92,16 +67,13 @@ logger.info("Обработчик кнопки 'Назад' зарегистри
 dp.callback_query_handler(lambda call: call.data == 'back')(handlers.back.back_button_handler)
 
 # Обработчик команды /update
-logger.info("Обработчик команды /update зарегистрирован")
-dp.message_handler(lambda message: message.text == texts.change_data)(handlers.data.send_update)
+dp.message_handler(commands=['update'])(handlers.data.send_update)
 
 # Обработчик для обновления данных
-logger.info("Обработчик обновления данных зарегистрирован")
-dp.message_handler(lambda message: message.text == texts.update_data)(handlers.data.update_data)
+dp.message_handler(lambda message: message.text == "Обновить данные ♻")(handlers.data.update_data)
 
 # Обработчик для удаления данных
-logger.info("Обработчик удаления данных зарегистрирован")
-dp.message_handler(lambda message: message.text == texts.delete_data)(handlers.data.delete_data)
+dp.message_handler(lambda message: message.text == 'Удалить данные ❌')(handlers.data.delete_data)
 
 # Обработчик выбора действия (подтверждение удаления)
 logger.info("Обработчик выбора действия (подтверждение удаления) зарегистрирован")
@@ -116,21 +88,18 @@ logger.info("Обработчик получения телефона зарег
 dp.message_handler(state=config.UserRegistration.waiting_for_phone)(handlers.data.get_phone)
 
 # Обработчик просмотра товаров в корзине
-logger.info("Обработчик просмотра товаров в корзине зарегистрирован")
-dp.message_handler(lambda message: message.text == texts.cart)(handlers.cart.view_cart)
+dp.message_handler(lambda message: message.text == 'Корзина')(handlers.cart.view_cart)
 
 # Обработчик для добавления товара в корзину
 logger.info("Обработчик добавления товара в корзину зарегистрирован")
 dp.callback_query_handler(lambda call: call.data.startswith('cart_'))(handlers.cart.add_to_cart)
 
 # Обработчик удаления товаров в корзине
-logger.info("Обработчик удаления товаров из корзины зарегистрирован")
-dp.message_handler(lambda message: message.text == texts.delete_product_from_cart)(handlers.cart.start_remove_from_cart)
+dp.message_handler(lambda message: message.text == 'Удалить товар')(handlers.cart.start_remove_from_cart)
 dp.message_handler(state=config.CartState.waiting_for_product_id)(handlers.cart.process_remove_from_cart)
 
 # Обработчик очистки корзины
-logger.info("Обработчик очистки корзины зарегистрирован")
-dp.message_handler(lambda message: message.text == texts.clear_cart)(handlers.cart.ask_clear_cart)
+dp.message_handler(lambda message: message.text == 'Очистить корзину')(handlers.cart.ask_clear_cart)
 dp.callback_query_handler(lambda call: call.data == 'confirm_clear_cart')(handlers.cart.clear_cart)
 dp.callback_query_handler(lambda call: call.data == 'cancel_clear_cart')(handlers.cart.do_not_clear_cart)
 
