@@ -9,7 +9,7 @@ class Category(models.Model):
     
 
 class User(models.Model):
-    user_id = models.AutoField(primary_key=True)
+    user_id = models.BigIntegerField(primary_key=True, unique=True, verbose_name="Telegram ID")
     email = models.TextField(max_length=255, verbose_name="Email", unique=True, blank=True, null=True)
     phone = models.BigIntegerField(unique=True, blank=True, null=True)
 

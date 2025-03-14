@@ -22,8 +22,11 @@ from catalog import views as catalog_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', catalog_views.catalog, name='catalog'),
-    path('product/add/', catalog_views.add_product, name='add_product'),
+    path('', catalog_views.admin_dashboard, name='admin_dashboard'),
+    path('products/', catalog_views.product_list, name='product_list'),
+    path('products/add/', catalog_views.add_product, name='add_product'),
+    path('edit_product/<int:product_id>/', catalog_views.edit_product, name='edit_product'),
+    path('delete_product/<int:product_id>/', catalog_views.delete_product, name='delete_product'),
     path('categories/', catalog_views.category_list, name='category_list'),
     path('categories/add/', catalog_views.add_category, name='add_category'),
     path('categories/edit/<int:category_id>/', catalog_views.edit_category, name='edit_category'),
