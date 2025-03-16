@@ -1,7 +1,7 @@
 # Импорт библиотек
 import logging
 from aiogram import types
-from . import catalog, start
+from . import catalog, start, cart
 from texts import texts
 from aiogram.dispatcher.storage import FSMContext
 from logging_config import setup_logger
@@ -34,7 +34,7 @@ async def back_button_handler(call: types.CallbackQuery, state: FSMContext):
         logger.info("Пользователь на начальном шаге, выводим текст.")
         await call.message.answer(texts.back_if_start)
 
-    elif current_step == 'help' or current_step == 'commands':
+    elif current_step == 'help' or current_step == 'commands' or current_step == 'cart':
         logger.info(f"Переход от этапа '{current_step}' к этапу 'start'.")
         await state.update_data(current_step='start')
         await start.send_start(call.message, state)
@@ -56,6 +56,14 @@ async def back_button_handler(call: types.CallbackQuery, state: FSMContext):
         logger.info(f"Переход от этапа 'category' к этапу 'start'.")
         await state.update_data(current_step='start')
         await start.send_start(call.message, state)
+
+
+    # ========================= SHOPPING CART ========================= #
+    elif current_step == 'add_to_cart':
+        logger.info(f"Переход от этапа 'add_to_cart' к этапу 'cart'.")
+        await state.update_data(current_step='cart')
+        await cart.view_cart(call.message, state)
+
 
     # ========================= ERROR ========================= #
     else:

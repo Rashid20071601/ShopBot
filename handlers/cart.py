@@ -18,23 +18,29 @@ async def view_cart(message: types.Message, state: FSMContext):
 
     user = await sync_to_async(lambda: User.objects.get(pk=user_id))()  # type: ignore
 
+    await state.update_data(current_step='cart')
+
     # Получаем товары в корзине с их названиями и ценами
     cart_items = await sync_to_async(lambda: list(Cart.objects.filter(user=user).select_related('product').values('product__name', 'product__price', 'quantity')))()  # type: ignore
     
     if not cart_items:
         logger.info(f"Корзина пользователя {user_id} пуста.")
         await message.answer(texts.view_cart_if_empty, reply_markup=types.ReplyKeyboardRemove())
+        await message.answer(texts.back, reply_markup=inline.back_kb)
     else:
         cart_items_str = '\n'.join([f"{i+1}. {item['product__name']} - {item['product__price']} руб. - {item['quantity']} шт." for i, item in enumerate(cart_items)])
         logger.debug(f"Товары в корзине пользователя {user_id}: {cart_items_str}")
         await message.answer(f"{texts.view_cart}\n\n{cart_items_str}", reply_markup=reply.cart_kb)
+        await message.answer(texts.back, reply_markup=inline.back_kb)
 
 
 # Функция добавления товара в корзину
-async def add_to_cart(call: types.CallbackQuery):
+async def add_to_cart(call: types.CallbackQuery, state: FSMContext):
     user_id = call.from_user.id
     product_id = int(call.data.split('_')[-1])  # Извлекаем ID товара из callback-данных
     logger.info(f"Пользователь {user_id} добавил товар {product_id} в корзину.")
+    
+    await state.update_data(current_step='add_to_cart')
 
     user = await sync_to_async(lambda: User.objects.get(pk=user_id))()  # type: ignore
     product = await sync_to_async(lambda: Product.objects.get(pk=product_id))()  # type: ignore
@@ -73,43 +79,49 @@ async def start_remove_from_cart(message: types.Message, state: FSMContext):
 
 
 async def process_remove_from_cart(message: types.Message, state: FSMContext):
-    user_id = message.from_user.id
-    logger.info(f"Пользователь {user_id} ввёл номер товара для удаления: {message.text}.")
+    try:
+        user_id = message.from_user.id
+        logger.info(f"Пользователь {user_id} ввёл номер товара для удаления: {message.text}.")
 
-    user = await sync_to_async(lambda: User.objects.get(pk=user_id))()  # type: ignore
+        user = await sync_to_async(lambda: User.objects.get(pk=user_id))()  # type: ignore
 
-    # Проверяем, что пользователь ввел число
-    if not message.text.isdigit():
-        logger.warning(f"Пользователь {user_id} ввёл некорректный номер товара: {message.text}.")
-        await message.answer(texts.process_remove_from_cart_if_undefined)
-        return
+        # Проверяем, что пользователь ввел число
+        if not message.text.isdigit():
+            logger.warning(f"Пользователь {user_id} ввёл некорректный номер товара: {message.text}.")
+            await message.answer(texts.process_remove_from_cart_if_undefined)
+            await start_remove_from_cart(message, state)
 
-    product_id = int(message.text) - 1
+        product_id = int(message.text) - 1
 
-    # Получаем товары в корзине
-    cart_items = await sync_to_async(lambda: list(Cart.objects.filter(user=user).select_related('product').values_list('product__product_id', 'quantity')))()  # type: ignore
+        # Получаем товары в корзине
+        cart_items = await sync_to_async(lambda: list(Cart.objects.filter(user=user).select_related('product').values_list('product__product_id', 'quantity')))()  # type: ignore
 
-    if 0 <= product_id < len(cart_items):
-        product_to_delete, quantity = cart_items[product_id]
-        if quantity > 1:
-            # Если товаров больше одного, уменьшаем количество
-            await sync_to_async(lambda: Cart.objects.filter(user=user, product_id=product_to_delete).update(quantity=quantity - 1))()  # type: ignore
-            logger.debug(f"Количество товара {product_to_delete} уменьшено для пользователя {user_id}.")
+        if 0 <= product_id < len(cart_items):
+            product_to_delete, quantity = cart_items[product_id]
+            if quantity > 1:
+                # Если товаров больше одного, уменьшаем количество
+                await sync_to_async(lambda: Cart.objects.filter(user=user, product_id=product_to_delete).update(quantity=quantity - 1))()  # type: ignore
+                logger.debug(f"Количество товара {product_to_delete} уменьшено для пользователя {user_id}.")
+            else:
+                # Если товар один, удаляем его из корзины
+                await sync_to_async(lambda: Cart.objects.filter(user=user, product_id=product_to_delete).delete())()  # type: ignore
+                logger.debug(f"Товар {product_to_delete} удалён из корзины пользователя {user_id}.")
+            await message.answer(texts.process_remove_from_cart)
+            await view_cart(message, state)
+
         else:
-            # Если товар один, удаляем его из корзины
-            await sync_to_async(lambda: Cart.objects.filter(user=user, product_id=product_to_delete).delete())()  # type: ignore
-            logger.debug(f"Товар {product_to_delete} удалён из корзины пользователя {user_id}.")
-        await message.answer(texts.process_remove_from_cart)
-        await view_cart(message, state)
+            logger.warning(f"Товар с индексом {product_id} не найден для пользователя {user_id}.")
+            await message.answer(texts.process_remove_from_cart_if_not_product)
+            await view_cart(message, state)
 
-    else:
-        logger.warning(f"Товар с индексом {product_id} не найден для пользователя {user_id}.")
-        await message.answer(texts.process_remove_from_cart_if_not_product)
-        await view_cart(message, state)
-
-    # Завершаем состояние
-    await state.finish()
-    logger.debug(f"Состояние пользователя {user_id} сброшено.")
+        # Завершаем состояние
+        await state.finish()
+        logger.debug(f"Состояние пользователя {user_id} сброшено.")
+    
+    except Exception as e:
+        logger.error(f"Произошла ошибка при удалении товара из корзины пользователя {user_id}: {str(e)}.")
+        await state.finish()
+        logger.debug(f"Состояние пользователя {user_id} сброшено.")
 
 
 async def ask_clear_cart(message: types.Message):

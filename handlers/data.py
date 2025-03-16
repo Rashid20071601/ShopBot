@@ -4,7 +4,6 @@ from aiogram.dispatcher.storage import FSMContext
 from config import *
 from keyboards import inline, reply
 from texts import texts
-import config
 from catalog.models import *  # type: ignore
 from asgiref.sync import sync_to_async
 from logging_config import setup_logger
